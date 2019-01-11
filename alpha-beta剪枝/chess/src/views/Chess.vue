@@ -53,6 +53,7 @@
 </template>
 
 <script>
+import { setTimeout } from 'timers';
 export default{
   data () {
     return {
@@ -194,12 +195,15 @@ export default{
     ending: function(id) {
       this.turnToPlayer=false
       this.end=true
+      console.log("end2:", this.end)
       switch(id){
         case "BK":
           this.endInfo = "You Win!"
+          console.log("You Win!")
           break
         case "RK":
           this.endInfo = "You Lose!"
+          console.log("You Lose!")
           break
       }
     },
@@ -208,24 +212,6 @@ export default{
       setTimeout(()=> {
         Object.assign(this.$data, this.$options.data())
       }, 500)
-    },
-    // 帅与将 不能正对
-    check: function() {
-      let posBK = this.formatPos({"x": this.$refs["BK"].offsetLeft + this.chessWidth/2, "y": this.$refs["BK"].offsetTop + this.chessHeight/2})
-      let posRK = this.formatPos({"x": this.$refs["RK"].offsetLeft + this.chessWidth/2, "y": this.$refs["RK"].offsetTop + this.chessHeight/2})
-      if(posBK.x == posRK.x) {
-        let count = 0
-        for(let i=posBK.y+1; i<posRK.y-1; i++) {
-          if(this.chessBoard[i][posBK.x] != 0) {
-            count++
-          }
-        }
-        if(count > 0) {
-          return false
-        }
-        return true
-      }
-      return false
     },
     validMove: function(chessBoard, id, from, to) {
       switch(id.slice(0, 2)) {
@@ -405,17 +391,10 @@ export default{
         // 帥
         case "RK":
           // 不能出九宫
-          if(this.check()){
-            return true
-          }
           if(to.y < this.redJiuGongTop || to.x<this.redJiuGongLeft || to.x > this.redJiuGongRight){
             return false
           }
-
         case "BK":
-          if(id[0] == this.black && this.check()){
-            return true
-          }
           if(id[0] == this.black && (to.y > this.blackJiuGongBottom || to.x<this.blackJiuGongLeft || to.x > this.blackJiuGongRight)) {
             return false
           }
@@ -438,14 +417,10 @@ export default{
       let target = this.getTarget(this.chessBoard, to)
       this.swap(this.chessBoard, from, to)
       to = this.realPos(to)
-      // document.getElementById(selected.id).setAttribute("style", "top:"+to.y+"px;left:"+to.x+"px")
       selected.style.top = to.y+"px"
       selected.style.left = to.x+"px"
-      // selected.style.transition = "all 0.5s"
       if(target != null) {
-        // setTimeout(() => {
-          target.style.display = "none"
-        // }, 200)
+        target.style.display = "none"
       }
       if(target!=null && (target.id === "BK" || target.id === "RK")) {
         this.ending(target.id)
@@ -468,24 +443,22 @@ export default{
           }
         }
       }
-      if(count < 6) {
+      if(count < 8) {
         this.depth = 6
       } else if(count < 15) {
         this.depth = 5
-      } else if(count < 28) {
-        this.depth = 4
       }
       return count
     },
     imgClick: function(event) {
       let from = {}, to = {} 
       if(this.selected == null && event.target.id.indexOf("R") === 0) {
-        // console.log("select")
+        console.log("select")
         event.target.className = "OOS"
         this.selected = event.target
         return
       } else if (this.selected != null && event.target.id.indexOf("R") === 0) {
-        // console.log("change select")
+        console.log("change select")
         if(this.selected.id != event.target.id) {
           event.target.className = "OOS"
           this.selected.className = ""
@@ -495,7 +468,7 @@ export default{
           this.selected=null
         }
       } else if(this.selected != null && event.target.id.indexOf("B") === 0) {
-        // console.log("try to eat")
+        console.log("try to eat")
         from = this.formatPos({"x": this.selected.offsetLeft + this.chessWidth/2, "y": this.selected.offsetTop + this.chessWidth/2})
         to = this.formatPos({"x": event.target.offsetLeft + this.chessWidth/2, "y": event.target.offsetTop + this.chessHeight/2})
         if(this.validMove(this.chessBoard, this.selected.id, from, to)) {
@@ -503,10 +476,16 @@ export default{
           this.selected.className = ""
           this.selected = null
           this.updateDepth()
-          this.robot()
+          if(this.end) {
+            return
+          }
+          setTimeout(()=>{
+            this.robot()
+            this.turnToPlayer = true
+          }, 0)
         }
       } else if(this.selected != null) {
-        // console.log("move")
+        console.log("move")
         from = this.formatPos({"x": this.selected.offsetLeft + this.chessWidth/2, "y": this.selected.offsetTop + this.chessWidth/2})
         to = this.formatPos({"x": event.layerX, "y": event.layerY})
         if(this.validMove(this.chessBoard, this.selected.id, from, to)) {
@@ -514,16 +493,21 @@ export default{
           this.selected.className = ""
           this.selected = null
           this.updateDepth()
-          this.robot()
+          this.turnToPlayer = false
+          if(this.end) {
+            return
+          }
+          setTimeout(()=>{
+            this.robot()
+            this.turnToPlayer = true
+          }, 0)
         }
       }
     },
     robot: function() {
-      this.turnToPlayer = false
       this.robotNextStep(this.getCopy(this.chessBoard), this.black, this.INT_MIN, this.INT_MAX, 1);
       // this.displayChessBoard(this.chessBoard)
       this.move(this.$refs[this.bestStep.id], this.bestStep.from, this.bestStep.to)
-      this.turnToPlayer = true
       // this.displayChessBoard(this.chessBoard)
     },
     evaluation: function(chessBoard) {
@@ -549,7 +533,7 @@ export default{
               if(this.chessPosValue[chessBoard[i][j][1]] != undefined) {
                 redValue += this.chessPosValue[chessBoard[i][j][1]][i][j] * 8
               }
-              // tos = this.generateNextStep(chessBoard, {"x": j, "y": i})
+              tos = this.generateNextStep(chessBoard, {"x": j, "y": i})
               // for(let k=0, len=tos.length; k<len; k++) {
               //   target = this.getTarget(chessBoard, tos[k])
               //   if(target!=null && target.id[0] == this.black && this.validMove(chessBoard, chessBoard[i][j], {"x": j, "y": i}, tos[k])) {
@@ -651,7 +635,7 @@ export default{
   }
   img {
     position: absolute;
-    /* transition: all 0.2s; */
+    /* transition: all 0.5s; */
   }
   .OOS {
     background: url("../assets/chesses/OOS.png")
